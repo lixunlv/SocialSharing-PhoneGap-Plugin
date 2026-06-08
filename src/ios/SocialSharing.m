@@ -556,6 +556,30 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
   return [[UIApplication sharedApplication] canOpenURL: [NSURL URLWithString:@"twitter://"]]; // requires whitelisting on iOS9
 }
 
+- (void)openURL:(NSURL *)url command:(CDVInvokedUrlCommand *)command {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    void (^sendResult)(BOOL) = ^(BOOL success) {
+      CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:(success ? CDVCommandStatus_OK : CDVCommandStatus_ERROR)];
+      [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    };
+
+    if (url == nil) {
+      sendResult(NO);
+      return;
+    }
+
+    UIApplication *application = [UIApplication sharedApplication];
+    if (@available(iOS 10.0, *)) {
+      [application openURL:url options:@{} completionHandler:sendResult];
+    } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+      sendResult([application openURL:url]);
+#pragma GCC diagnostic pop
+    }
+  });
+}
+
 // this is only an internal test method for now, can be used to open a share sheet with 'Open in xx' links for tumblr, drive, dropbox, ..
 - (void)openImage:(NSString *)imageName {
   UIImage* image =[self getImage:imageName];
@@ -685,9 +709,7 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
     NSString *encodedShareStringForWhatsApp = [NSString stringWithFormat:@"whatsapp://send?%@%@text=%@", abidString, phoneString, encodedShareString];
 
     NSURL *whatsappURL = [NSURL URLWithString:encodedShareStringForWhatsApp];
-    [[UIApplication sharedApplication] openURL: whatsappURL];
-    CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    [self openURL:whatsappURL command:command];
   }
 }
 
